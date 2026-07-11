@@ -21,7 +21,7 @@ The skills outline reflects the exam version effective **July 21, 2026** — Mic
 | [exam_sections.md](exam_sections.md) | Full exam domain breakdown with weightings, straight from the official skills outline |
 | [study_cheat_sheet.md](study_cheat_sheet.md) | Quick-reference cheat sheet — decision trees, security layers, Delta/streaming syntax |
 | [study_flashcards.md](study_flashcards.md) | Flashcards for key concepts |
-| [study_practice_questions.md](study_practice_questions.md) | 20 practice exam questions with explanations |
+| [study_practice_questions.md](study_practice_questions.md) | 30 practice exam questions with explanations |
 | [study_topic_summaries.md](study_topic_summaries.md) | Topic summaries for a final review pass |
 
 ## Exam domains

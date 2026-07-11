@@ -1,6 +1,6 @@
 # DP-700 Practice Questions
 
-20 questions across all three domains. Answers and explanations at the end of each question.
+30 questions across all three domains. Answers and explanations at the end of each question.
 
 ---
 
@@ -221,3 +221,113 @@ C. Eventstream
 D. Data Activator
 
 > **Answer: B.** The Apache Airflow Job item runs a managed Airflow environment, letting you keep existing DAGs and provider-package operators rather than rebuilding the logic as pipeline activities.
+
+---
+
+**21.** A user has the Viewer workspace role on a lakehouse. What data can they see through Spark or the SQL analytics endpoint by default, before any OneLake security role is applied?
+
+A. All lakehouse data
+B. None — Viewer-role users have no OneLake data access by default
+C. Only bronze-layer tables
+D. Whatever their Microsoft Entra group grants
+
+> **Answer: B.** Viewer role (and item-level Read-only permission) grants no OneLake data access by default; OneLake data access roles are what grant it, most commonly starting from the built-in `DefaultReader` role.
+
+---
+
+**22.** You restrict a user to a custom OneLake security role scoped to gold-layer tables only, but they can still query bronze and silver data. What did you most likely forget?
+
+A. To grant them the Contributor workspace role
+B. To remove them from the `DefaultReader` role
+C. To apply row-level security
+D. To enable OneLake workspace settings
+
+> **Answer: B.** Every lakehouse ships with a `DefaultReader` role granting broad read access; a narrower custom role doesn't override it unless the user is also removed from `DefaultReader`.
+
+---
+
+**23.** A dimension attribute (customer address) needs to preserve full history because sales must be attributed to the address at the time of each transaction. Which SCD type fits?
+
+A. Type 0
+B. Type 1
+C. Type 2
+D. Type 3
+
+> **Answer: C.** Type 2 inserts a new row per change and marks the old row expired, preserving full history — the standard choice when a fact needs to reference the dimension state at a point in time.
+
+---
+
+**24.** Which T-SQL masking function would you use to show only the last 4 digits of a credit card number?
+
+A. `default()`
+B. `email()`
+C. `partial(prefix, padding, suffix)`
+D. `random(low, high)`
+
+> **Answer: C.** `partial()` lets you expose a configurable number of characters at the start/end with custom padding in between — e.g. `partial(0,"XXXX-XXXX-XXXX-",4)`.
+
+---
+
+**25.** A table has column-level security applied and is used by a Power BI semantic model in Direct Lake mode. What happens to queries against that table?
+
+A. They fail with a permission error
+B. They automatically fall back to DirectQuery
+C. CLS is silently ignored in Direct Lake mode
+D. The table is excluded from the semantic model automatically
+
+> **Answer: B.** Direct Lake automatically falls back to DirectQuery when CLS is applied to a table — security is still enforced, just at DirectQuery performance instead of the Direct Lake baseline.
+
+---
+
+**26.** What is the recommended way to combine Git integration with deployment pipelines to avoid sync conflicts across environments?
+
+A. Connect every stage workspace (Dev, Test, Prod) to Git independently
+B. Connect only the Development workspace to Git; use the deployment pipeline to promote to Test/Production
+C. Connect only the Production workspace to Git
+D. Git integration and deployment pipelines can't be used together
+
+> **Answer: B.** Connecting only Development to Git avoids Git sync conflicts across multiple stages — deployment pipelines then handle Fabric-side promotion to Test and Production.
+
+---
+
+**27.** In Fabric's 5-level hierarchy, which level sits directly between Tenant and Domain?
+
+A. Workspace
+B. Capacity
+C. Item
+D. Region
+
+> **Answer: B.** The hierarchy is Tenant → Capacity → Domain → Workspace → Item.
+
+---
+
+**28.** An Activator rule needs to catch a sustained temperature problem while ignoring brief sensor spikes. Which combination of settings achieves this?
+
+A. Threshold condition with "Every time" occurrence
+B. Summarization (e.g. Average over a window) plus "When it has been true for" occurrence
+C. A Property filter with no Condition
+D. Missing-data detection
+
+> **Answer: B.** Summarizing the raw signal (e.g. average temperature over a 10-minute window) smooths noise, and "When it has been true for" only fires once the condition is sustained, not on every brief fluctuation.
+
+---
+
+**29.** What differentiates a KQL materialized view from a plain stored function?
+
+A. Materialized views precompute and auto-maintain aggregation results; stored functions just encapsulate reusable query logic with no precomputation
+B. Stored functions are faster than materialized views
+C. Materialized views can't accept parameters
+D. There is no meaningful difference
+
+> **Answer: A.** A materialized view maintains precomputed aggregation results (updated incrementally via a background process) for fast queries over huge tables; a stored function is just a reusable, optionally parameterized query — no precomputation involved.
+
+---
+
+**30.** Which Fabric warehouse monitoring surface would you use to see which queries have been consistently expensive over the past week, as opposed to what's running right now?
+
+A. Dynamic management views (DMVs)
+B. Query insights
+C. The Capacity Metrics app
+D. `.show ingestion failures`
+
+> **Answer: B.** Query insights views track historical querying trends (duration, frequency over time); DMVs show currently-running activity.
