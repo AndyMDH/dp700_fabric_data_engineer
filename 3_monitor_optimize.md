@@ -119,12 +119,13 @@ dt.vacuum(168)
 
 **ZORDER BY** co-locates related data within compacted files by the given column(s), so filters on that column can skip more files (**data skipping**) — pick high-cardinality columns commonly used in `WHERE` filters.
 
-**V-Order** — a Fabric-specific Parquet write-time optimization (special sorting, row-group distribution, dictionary encoding, and compression) applied optionally alongside OPTIMIZE. Exact numbers worth knowing:
-- Enabled **by default** in Fabric.
-- Incurs roughly **~15% write overhead**.
-- In exchange, Power BI and SQL (via Microsoft's VertiScan technology) get dramatically faster reads; Spark and other engines (no VertiScan) still see **~10%, sometimes up to 50%, faster reads**.
+**V-Order** — a Fabric-specific Parquet write-time optimization (special sorting, row-group distribution, dictionary encoding, and compression) applied optionally alongside OPTIMIZE. Exact numbers worth knowing (corrected and verified live against Microsoft's current docs — [Optimize Delta Lake tables with V-Order](https://learn.microsoft.com/en-us/fabric/data-engineering/delta-optimization-and-v-order) — a training-module-only pass had this stale):
+- **Disabled by default in all newly created Fabric workspaces** (`spark.sql.parquet.vorder.default = false`), specifically to favor write-heavy data engineering workloads. Older material (including some training modules) says "on by default" — that reflects an earlier product default and is no longer current. Enable it deliberately for read-heavy scenarios (dashboarding, interactive analytics, Direct Lake).
+- Control it at three levels: **session** (`SET spark.sql.parquet.vorder.default = TRUE/FALSE`), **table property** (`TBLPROPERTIES("delta.parquet.vorder.enabled")`), or **per write operation** (DataFrame writer option `parquet.vorder.enabled`). In Fabric runtime 1.3+, the older `spark.sql.parquet.vorder.enable` setting is removed — don't use it if migrating from an older runtime.
+- **In a Warehouse**, V-Order is controlled at the whole-database level (`ALTER DATABASE CURRENT SET VORDER = OFF;`), not per table — and **once disabled on a Warehouse, it cannot be re-enabled**. Check status via `SELECT [name],[is_vorder_enabled] FROM sys.databases;`.
+- Real-world tradeoff, from an independent 1.1-billion-row CTAS load test (not Microsoft's own figure): writes were **~50% slower** with V-Order on vs off, while reads averaged **~2x faster** with it on — Microsoft's own docs describe "often around 15% [write overhead] on average," so treat the exact percentage as workload-dependent, not a fixed constant, and expect exam framing around the *direction* of the tradeoff (write cost vs read/Direct Lake benefit) rather than a specific number.
 - **100% compliant with open-source Parquet** — any Parquet engine can still read a V-Ordered file, it just doesn't get the speedup.
-- Not worth it for write-intensive, read-rarely scenarios (e.g. a staging table read once or twice) — disabling it there can reduce ingestion processing time.
+- Favor enabling it for read-heavy/reporting/Direct Lake scenarios; leave it off (the new default) for write-heavy staging/ingestion tables.
 
 **VACUUM** deletes Parquet files no longer referenced by the transaction log, past the retention window — but never deletes the transaction log itself, so `DESCRIBE HISTORY` still shows past versions even after a vacuum (you just can't time-travel to a vacuumed version anymore). Choose retention based on data-retention requirements, storage cost, change frequency, and regulatory needs; **default and minimum is 168 hours (7 days)** — Fabric won't let you set it shorter.
 

@@ -7,9 +7,11 @@ Study notes and reference material for [Exam DP-700: Implementing Data Engineeri
 Content is generated in two layers:
 
 1. **Skills outline** — Microsoft's official [DP-700 study guide](https://learn.microsoft.com/en-us/credentials/certifications/resources/study-guides/dp-700), fetched directly (WebSearch + WebFetch), gives the exact domains/weights/bullets the exam measures.
-2. **Teaching depth** — the actual [Microsoft Learn training modules](https://learn.microsoft.com/en-us/training/courses/dp-700t00) behind the official DP-700 course (found via the course page's module manifest: `dp-700t00`'s five constituent learning paths — Ingest Data, Implement a Lakehouse, Implement a Data Warehouse, Implement Real-Time Intelligence, Manage a Fabric Environment). Each module's individual **unit pages** (not just the module landing page, which is only a table of contents) were fetched for their real content — concepts, terminology, exact T-SQL/KQL/PySpark syntax, and numeric specifics (e.g. V-Order's ~15% write overhead, VACUUM's 168-hour default retention). Every major subsection cites its source module inline.
+2. **Teaching depth** — the actual [Microsoft Learn training modules](https://learn.microsoft.com/en-us/training/courses/dp-700t00) behind the official DP-700 course (found via the course page's module manifest: `dp-700t00`'s five constituent learning paths — Ingest Data, Implement a Lakehouse, Implement a Data Warehouse, Implement Real-Time Intelligence, Manage a Fabric Environment). Each module's individual **unit pages** (not just the module landing page, which is only a table of contents) were fetched for their real content — concepts, terminology, exact T-SQL/KQL/PySpark syntax, and numeric specifics (e.g. VACUUM's 168-hour default/minimum retention). Every major subsection cites its source module inline.
 
 Technical syntax was additionally cross-checked against live API docs via the Context7 MCP tool (`delta-io/delta` for `OPTIMIZE`/`VACUUM`/`ZORDER`, `pyspark` for structured-streaming windowing) so it stays accurate independent of the Fabric-specific docs.
+
+3. **Independent verification pass with Exa** — real `exa-py` calls (`search`, `search_and_contents`, `get_contents` with `livecrawl="always"`), not just Microsoft's own pages, against real-world blogs, Microsoft Fabric Community forum threads, and actual exam-taker writeups. This caught one genuine staleness bug the training-module pass alone missed (**V-Order's default state changed from on to off** in newer Fabric workspaces — Microsoft's current docs override what an older training module said) and filled a real gap (**deployment pipeline "item pairing," data-not-copied, and gateway-remapping behavior**) flagged by an actual exam-taker's writeup as tested but undocumented in the training modules. Content sourced from Microsoft's own docs is authoritative by default; independent/community sources were used to catch drift and fill gaps, not to override official Microsoft material where the two agree.
 
 The skills outline reflects the exam version effective **July 21, 2026** — Microsoft publishes the incoming skills-measured revision ahead of its effective date on the same study guide page, alongside a change log against the prior version.
 
@@ -46,30 +48,39 @@ https://learn.microsoft.com/en-us/credentials/certifications/resources/study-gui
 
 Watch for a "Change log" table on that page comparing the prior vs. current skills-measured version — the "as of [date]" column is the one to study from if a revision is upcoming.
 
-If you have an Exa API key and want broader web coverage beyond the one canonical page (e.g. community writeups, exam-readiness blog posts), the same `exa-py` workflow from the Databricks repo applies:
+If you have an Exa API key, use it as an **independent verification pass** on top of the training-module content, not a replacement for it — Microsoft's own docs are authoritative, but training modules can lag behind product changes (this is exactly how the V-Order default-state staleness bug below was caught).
+
+Store the key in macOS Keychain rather than a plaintext `.env` (see `security add-generic-password -a "$USER" -s "EXA_API_KEY" -w "your-key"`), then in an isolated venv:
 
 ```bash
+python3 -m venv venv && source venv/bin/activate
 pip install exa-py
-export EXA_API_KEY="your_key_here"
 ```
 
 ```python
+import os, subprocess
 from exa_py import Exa
-import os
 
-exa = Exa(api_key=os.environ["EXA_API_KEY"])
+key = subprocess.check_output(
+    ["security", "find-generic-password", "-a", os.environ["USER"], "-s", "EXA_API_KEY", "-w"]
+).decode().strip()
+exa = Exa(api_key=key)
 
-results = exa.search(
-    "DP-700 Microsoft Fabric Data Engineer exam study guide 2026",
-    type="deep",
-    num_results=10,
-    contents={"highlights": True},
+# Broad sweep: find community writeups, exam-taker experiences, and drift from official docs
+r = exa.search("DP-700 Microsoft Fabric exam gotchas tricky questions", type="auto", num_results=6)
+for res in r.results:
+    print(res.title, res.url)
+
+# Targeted verification: live-crawl a specific claim you're not fully sure of
+c = exa.get_contents(
+    ["https://learn.microsoft.com/en-us/fabric/data-engineering/delta-optimization-and-v-order"],
+    text={"max_characters": 5000},
+    livecrawl="always",  # bypasses Exa's cache, forces a fresh fetch
 )
-
-for r in results.results:
-    print(r.title, r.url)
-    print(r.highlights)
+print(c.results[0].text)
 ```
+
+Good query patterns for this repo specifically: `"<topic> exam experience/gotchas"` surfaces real test-taker writeups (often catches emphasis/nuance official docs don't state directly); `"<specific claim> Microsoft Fabric"` plus a live-crawled `get_contents` on the top official-docs hit is the fastest way to check whether a training-module-sourced fact has gone stale.
 
 ### Step 2 — Pull the real teaching content from Microsoft Learn training modules
 

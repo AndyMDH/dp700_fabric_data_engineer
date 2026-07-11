@@ -117,7 +117,7 @@ VACUUM events RETAIN 168 HOURS;           -- remove stale files (default retenti
 ```
 
 - **OptimizeWrite** (default on): writes fewer, larger files at write time — prevents the small-file problem before it starts. Toggle: `spark.conf.set("spark.microsoft.delta.optimizeWrite.enabled", True/False)`.
-- **V-Order**: Fabric's default write-time Parquet optimization — ~15% write overhead, in exchange for faster reads (Power BI/SQL via VertiScan get the most; Spark/other engines still ~10%, up to 50%, faster). 100% Parquet-compliant. Leave on unless write throughput is the bottleneck (e.g. a write-once staging table).
+- **V-Order**: Parquet write-time optimization — **disabled by default in new workspaces** (favors write-heavy engineering workloads); enable deliberately for read-heavy/Direct Lake scenarios. Control via `spark.sql.parquet.vorder.default` (session), table property, or per-write option; in a Warehouse it's whole-database (`ALTER DATABASE CURRENT SET VORDER = OFF`) and **irreversible once turned off**. Real-world tradeoff is workload-dependent (one test: ~50% slower writes, ~2x faster reads when on) — don't anchor on a fixed percentage.
 - Don't shorten `VACUUM` retention below what a concurrent reader or time-travel query might still need — 168 hours (7 days) is both the default *and* the minimum Fabric allows.
 
 ---

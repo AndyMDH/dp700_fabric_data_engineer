@@ -1,6 +1,6 @@
 # DP-700 Practice Questions
 
-30 questions across all three domains. Answers and explanations at the end of each question.
+34 questions across all three domains. Answers and explanations at the end of each question.
 
 ---
 
@@ -331,3 +331,47 @@ C. The Capacity Metrics app
 D. `.show ingestion failures`
 
 > **Answer: B.** Query insights views track historical querying trends (duration, frequency over time); DMVs show currently-running activity.
+
+---
+
+**31.** In a newly created Fabric workspace, what is V-Order's default state, and why?
+
+A. Enabled by default, to maximize read performance everywhere
+B. Disabled by default, to favor write-heavy data engineering workloads
+C. Enabled by default, but only for Warehouses
+D. There is no default — it must be set explicitly on every write
+
+> **Answer: B.** As of Microsoft's current documentation, V-Order is disabled by default in new workspaces specifically to optimize write-heavy ingestion/transformation performance — enable it deliberately for read-heavy or Direct Lake scenarios. (Older material describing it as "on by default" reflects a since-changed product default.)
+
+---
+
+**32.** You disable V-Order on a Fabric Warehouse using `ALTER DATABASE CURRENT SET VORDER = OFF;`. What should you know before doing this?
+
+A. It only affects newly created tables, existing tables are unaffected
+B. It can be re-enabled at any time with no consequence
+C. It applies to the whole database, not per table, and cannot be re-enabled once turned off
+D. It requires a support ticket to Microsoft to apply
+
+> **Answer: C.** In a Warehouse, V-Order is a whole-database setting (unlike in a Lakehouse, where it can be controlled per session/table/write), and once disabled it cannot be turned back on.
+
+---
+
+**33.** During a deployment pipeline promotion from Test to Production, how does Fabric know which item in Production corresponds to which item in Test, so it overwrites rather than duplicates?
+
+A. Matching item names only
+B. A persistent connection between the parent item and its clone across stages ("item pairing"), created on first deploy and reused on every subsequent deploy
+C. Fabric always creates new items and never overwrites
+D. The deploying user manually maps each item every time
+
+> **Answer: B.** This parent-clone connection is what deployment pipelines use to identify existing target-stage content to overwrite — it's what "item pairing" refers to.
+
+---
+
+**34.** After deploying a semantic model from Test to Production via a deployment pipeline, the data in Production still looks stale. What's the most likely cause?
+
+A. The deployment failed silently
+B. Deployment only copies definitions/metadata, not data — the semantic model needs a manual refresh in the target stage
+C. Deployment rules weren't configured
+D. The gateway is misconfigured
+
+> **Answer: B.** Deployment pipelines copy item definitions and metadata between stages, not the underlying data — a semantic model must be refreshed after deployment before its data is current.

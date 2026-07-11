@@ -73,9 +73,14 @@ The **Fabric admin portal** organizes admin work into tenant settings, capacity 
 
 ### Deployment pipelines
 
+*Source: [The Microsoft Fabric deployment pipelines process](https://learn.microsoft.com/en-us/fabric/cicd/deployment-pipelines/understand-the-deployment-process), verified live via Exa.*
+
 - A **deployment pipeline** promotes Fabric items across stages — typically **Development → Test → Production** — by *copying* content between workspaces, not branching.
-- **Create one**: Workspaces icon → Deployment pipelines → New pipeline → name and define stages → assign a workspace to each stage.
-- **Deploy**: select the target stage, pick the source stage in the **Deploy from** dropdown, select **Deploy**. This copies all workspace content into the target stage (e.g. a pipeline that only exists in Development gets copied into Test).
+- **Create one**: Workspaces icon → Deployment pipelines → New pipeline → name and define stages → assign a workspace to each stage. **The number of stages and their names are permanent once the pipeline is created** — you cannot add/rename stages later, though you can toggle a stage's public/private status anytime.
+- **Deploy**: select the target stage, pick the source stage in the **Deploy from** dropdown, select **Deploy**. This copies all workspace content into the target stage (e.g. a pipeline that only exists in Development gets copied into Test). You can deploy to any *adjacent* stage, in either direction.
+- **Item pairing**: on redeploy, Fabric needs to know which target-stage item corresponds to which source-stage item, so it overwrites the right one instead of duplicating. It does this via a persistent **connection between a parent item and its clones** across stages, created on first deploy and kept on every subsequent deploy — this connection is what "item pairing" refers to on the exam.
+- **Data is not copied between stages — only definitions/metadata are.** After deploying a semantic model, you must manually **refresh** it in the target stage before its data is current; deployment itself doesn't move the underlying data.
+- **Gateway mappings aren't carried over automatically** on the first deployment to a new target item — you must manually reconfigure the gateway-to-data-source mapping in the target item's settings, then verify refresh succeeds. Subsequent deployments don't reset this configuration once set.
 - Supports **deployment rules** per stage (e.g., swap a connection string or parameter value automatically on deploy) so the same item works unmodified across environments.
 - **Combining with Git**: a common pattern connects **only the Development workspace** to Git — Git handles version control during development, while the deployment pipeline handles promotion to Test/Production. This avoids Git sync conflicts across multiple stages. Flow: connect Dev workspace to Git → make/commit changes in Dev → use the deployment pipeline's Deploy button to promote Dev → Test → Production (Fabric-side promotion, separate from the Git-side commit history).
 - Contrast: **Git integration** = version control / collaboration history; **deployment pipelines** = environment promotion. Many production setups use both together, as above.
