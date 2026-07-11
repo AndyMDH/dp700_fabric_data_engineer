@@ -79,11 +79,32 @@ Large or frequently-changing source?                    →  Incremental (waterm
 | Column-level security (CLS) | Columns | T-SQL `GRANT`/`DENY` on columns/views |
 | Object-level security (OLS) | Whole tables/objects | Deny access, hides from schema browsing |
 | OneLake data access roles | Folders/files | Engine-agnostic — enforced for Spark, SQL endpoint, Power BI, external readers alike |
-| Dynamic data masking | Column values at query time | Mask functions: default, email, random, custom string |
+| Dynamic data masking | Column values at query time | `default()`, `email()`, `partial(prefix,padding,suffix)`, `random(low,high)` |
 | Sensitivity labels | Classification + optional protection | Microsoft Purview Information Protection taxonomy |
 
 **Git integration** = version control within a workspace/branch.
 **Deployment pipelines** = promotion across Dev → Test → Prod stages, with deployment rules to swap environment-specific values.
+
+**Fabric security model — 3-level access evaluation**: Microsoft Entra ID authentication → Fabric access → Data security (workspace roles → item permissions → compute/granular permissions → OneLake security). Granting access at any of the first three layers gives *all* data in the item; OneLake security is the only layer that restricts *within* an item.
+
+**Admin hierarchy (5 levels)**: Tenant → Capacity → Domain → Workspace → Item.
+**Admin roles (4 tiers)**: Fabric admin (tenant-wide, = "Power BI Administrator" in Entra ID) → Capacity admin → Domain admin → Workspace admin.
+
+---
+
+## Slowly Changing Dimensions (SCD)
+
+| Type | Behavior |
+|---|---|
+| 0 | Never changes |
+| **1** | Overwrite, no history |
+| **2** | New row per change, old row marked expired — the one tested most alongside Type 1 |
+| 3 | Previous value in a separate column (limited history) |
+| 4 | Changing attributes moved to a separate dimension table |
+| 5 | Type 4 + Type 1 |
+| 6 | Type 2 + Type 3 |
+
+Fact table loads happen *after* dimension loads (facts reference dimension surrogate keys); for a Type 2 dimension, match the version valid *at the time of the fact event*, not the current version.
 
 ---
 
@@ -95,8 +116,9 @@ OPTIMIZE events ZORDER BY (eventType);    -- compact + co-locate by column for d
 VACUUM events RETAIN 168 HOURS;           -- remove stale files (default retention: 7 days)
 ```
 
-- **V-Order**: Fabric's default write-time Parquet optimization — speeds up downstream reads (Spark/SQL endpoint/Direct Lake); leave on unless write throughput is the bottleneck.
-- Don't shorten `VACUUM` retention below what a concurrent reader or time-travel query might still need.
+- **OptimizeWrite** (default on): writes fewer, larger files at write time — prevents the small-file problem before it starts. Toggle: `spark.conf.set("spark.microsoft.delta.optimizeWrite.enabled", True/False)`.
+- **V-Order**: Fabric's default write-time Parquet optimization — ~15% write overhead, in exchange for faster reads (Power BI/SQL via VertiScan get the most; Spark/other engines still ~10%, up to 50%, faster). 100% Parquet-compliant. Leave on unless write throughput is the bottleneck (e.g. a write-once staging table).
+- Don't shorten `VACUUM` retention below what a concurrent reader or time-travel query might still need — 168 hours (7 days) is both the default *and* the minimum Fabric allows.
 
 ---
 

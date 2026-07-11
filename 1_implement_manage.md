@@ -2,6 +2,8 @@
 
 <https://learn.microsoft.com/en-us/credentials/certifications/resources/study-guides/dp-700>
 
+Sourced from the official DP-700 skills outline plus the actual Microsoft Learn training modules behind it: [Manage a Microsoft Fabric environment](https://learn.microsoft.com/en-us/training/paths/manage-microsoft-fabric-environment/) (CI/CD, monitoring, security, admin) and the relevant units of [Implement a Lakehouse with Microsoft Fabric](https://learn.microsoft.com/en-us/training/paths/implement-lakehouse-microsoft-fabric/).
+
 ## Configure Microsoft Fabric Workspace Settings
 
 A **workspace** is the unit of collaboration and access control in Fabric — it maps to one Fabric/Power BI capacity and holds items (lakehouses, warehouses, notebooks, pipelines, eventhouses, etc.).
@@ -16,11 +18,28 @@ A **workspace** is the unit of collaboration and access control in Fabric — it
 - **High concurrency mode**: multiple notebooks share one Spark session/application to cut cold-start time and improve utilization; available for notebooks and pipelines separately.
 - **Environment**: a publishable item bundling Spark properties, libraries (public PyPI or custom wheel/jar), and resources — attach as the workspace default so every notebook/job inherits it without per-notebook config.
 
-### Domain workspace settings
+### Domain workspace settings and the Fabric admin hierarchy
 
-- **Domains** group related workspaces (e.g. by business unit) for governance and discoverability at the tenant level; **subdomains** nest further.
-- Assigning a workspace to a domain applies domain-level settings (e.g. certified/endorsed defaults, domain admins) and enables domain-scoped discovery in OneLake catalog.
-- Domain admins are distinct from workspace admins — domain admin manages membership/policy across all workspaces in the domain.
+*Source: [Administer a Microsoft Fabric environment](https://learn.microsoft.com/en-us/training/modules/administer-fabric/) — Understand the Fabric admin model.*
+
+Fabric operates on a **five-level hierarchy**, each with a narrower scope of control:
+
+1. **Tenant** — the entire Fabric environment, aligned 1:1 with an organization's Microsoft Entra ID directory. Platform-wide settings (security policy, feature availability) live here.
+2. **Capacity** — a dedicated compute/storage resource (an F-SKU) that powers Fabric workloads. Users consume capacity when they query, train models, or refresh reports; if the capacity runs out, work stops.
+3. **Domain** — a logical grouping of workspaces reflecting business structure (e.g. a Finance domain, a Risk domain). Domains let you apply governance policy and delegate admin rights at the department level, and enable domain-scoped discovery in the OneLake catalog. **Subdomains** nest further.
+4. **Workspace** — the collaboration container where teams create lakehouses, notebooks, and reports.
+5. **Item** — the data assets themselves (lakehouses, warehouses, notebooks, semantic models, reports).
+
+A matching **four-tier admin delegation model** lets a Fabric admin distribute responsibility instead of managing everything centrally:
+
+| Role | Scope | Responsibility |
+|---|---|---|
+| **Fabric admin** | Entire tenant | Tenant settings, all capacities/domains, assigns other admins. Listed in Microsoft Entra ID as **Power BI Administrator**. |
+| **Capacity admin** | One capacity | Manages workspaces assigned to that capacity, monitors capacity performance |
+| **Domain admin** | One domain | Manages workspaces within the domain, enforces domain-specific policy |
+| **Workspace admin** | One workspace | Controls access, manages items, assigns member permissions |
+
+The **Fabric admin portal** organizes admin work into tenant settings, capacity settings, domains, users (role assignment), audit logs, and monitoring — plus the Microsoft 365 admin center for licensing, Microsoft Entra ID for identity, and PowerShell/REST APIs for automation.
 
 ### OneLake workspace settings
 
@@ -35,11 +54,17 @@ A **workspace** is the unit of collaboration and access control in Fabric — it
 
 ## Implement Lifecycle Management in Fabric
 
+*Source: [Implement CI/CD in Microsoft Fabric](https://learn.microsoft.com/en-us/training/modules/implement-cicd-in-fabric/) — Implement version control and Git integration; Implement deployment pipelines.*
+
 ### Version control (Git integration)
 
-- Workspaces connect to a **Git repository** (Azure DevOps or GitHub) branch; each supported item type serializes to source-controlled files (Notebooks as `.py`/`.ipynb` with metadata, Lakehouses/Warehouses as schema definitions, pipelines as JSON, etc.).
-- Workflow: connect workspace → branch out for a feature → **commit** workspace changes to Git, or **update** the workspace from Git → open a PR → merge.
-- Supports standard branching workflows: one workspace per branch (e.g., dev/test/prod) is the common pattern, distinct from deployment pipelines (below).
+- Supported version control systems: **GitHub** and **Azure DevOps**. Integration is at the **workspace level** — you version the items developed within a workspace.
+- **Best practice**: don't develop directly in a shared, live workspace — changes there affect every user immediately. Instead, develop in an isolated workspace (or a client tool like Power BI Desktop / VS Code), then merge back.
+- Workflow to set up:
+  1. Set up a Git repository in GitHub or Azure DevOps.
+  2. In the workspace, go to **Workspace settings → Git integration** and connect it to a repository branch. Fabric syncs content between the workspace and Git so they match.
+  3. The workspace shows a **Git status** column and a source-control icon indicating how many items differ from the remote branch. Use **Changes** in the Source control window to push workspace edits to Git; use **Updates** to pull new Git commits into the workspace.
+- **Branching pattern**: connect a development workspace to the main branch, then use **Source control → Branch out to new workspace** to create an isolated branch *and* a new workspace synced to it in one step. Make changes there, commit them, then open a **Pull Request** in Git to merge into main — the shared development workspace picks up the merged changes on next sync. (When using client tools instead of the web UI, the flow is the same, just with a local clone/push instead of in-browser edits.)
 
 ### Database projects
 
@@ -48,12 +73,41 @@ A **workspace** is the unit of collaboration and access control in Fabric — it
 
 ### Deployment pipelines
 
-- A **deployment pipeline** promotes Fabric items across stages — typically **Development → Test → Production** — copying content between workspaces rather than branching.
+- A **deployment pipeline** promotes Fabric items across stages — typically **Development → Test → Production** — by *copying* content between workspaces, not branching.
+- **Create one**: Workspaces icon → Deployment pipelines → New pipeline → name and define stages → assign a workspace to each stage.
+- **Deploy**: select the target stage, pick the source stage in the **Deploy from** dropdown, select **Deploy**. This copies all workspace content into the target stage (e.g. a pipeline that only exists in Development gets copied into Test).
 - Supports **deployment rules** per stage (e.g., swap a connection string or parameter value automatically on deploy) so the same item works unmodified across environments.
-- Can be paired with Git integration: Git handles source control within a stage; deployment pipelines handle promotion between stages.
-- Contrast: **Git integration** = version control / collaboration history; **deployment pipelines** = environment promotion. Many production setups use both together.
+- **Combining with Git**: a common pattern connects **only the Development workspace** to Git — Git handles version control during development, while the deployment pipeline handles promotion to Test/Production. This avoids Git sync conflicts across multiple stages. Flow: connect Dev workspace to Git → make/commit changes in Dev → use the deployment pipeline's Deploy button to promote Dev → Test → Production (Fabric-side promotion, separate from the Git-side commit history).
+- Contrast: **Git integration** = version control / collaboration history; **deployment pipelines** = environment promotion. Many production setups use both together, as above.
 
 ## Configure Security and Governance
+
+*Source: [Secure data access in Microsoft Fabric](https://learn.microsoft.com/en-us/training/modules/secure-data-access-in-fabric/) and [Secure a Microsoft Fabric data warehouse](https://learn.microsoft.com/en-us/training/modules/secure-data-warehouse-in-microsoft-fabric/).*
+
+### The Fabric security model: three levels of access evaluation
+
+Fabric evaluates every access request sequentially:
+
+1. **Microsoft Entra ID authentication** — can the user authenticate at all?
+2. **Fabric access** — can the user access Fabric?
+3. **Data security** — can the user perform the requested action on this table/file? This third level has four configurable controls, each with increasingly specific scope:
+
+| Layer | Scope | Notes |
+|---|---|---|
+| **Workspace roles** | Every item in a workspace | Admin / Member / Contributor / Viewer. Use when a user needs broad, multi-item access. |
+| **Item permissions** | One item (e.g. one lakehouse) | Share an individual item without workspace-wide access. |
+| **Compute (granular) permissions** | Within one engine (e.g. SQL analytics endpoint) | T-SQL `GRANT`/`DENY`/`REVOKE`; also where RLS, CLS, and dynamic data masking are applied. |
+| **OneLake security** | Specific tables/folders, within an item | Role-based, engine-agnostic — enforced consistently across Spark, SQL, and OneLake APIs. |
+
+A key gotcha: across the first three layers, granting someone access to an item gives them **all** the data in it. **OneLake security** is what adds control *within* an item.
+
+### OneLake data access roles
+
+- Role-based access control (RBAC): each role defines **Data** (which tables/folders), **Permission** (`Read` or `ReadWrite`), **Members**, and optional row/column **Constraints**.
+- Configure via the lakehouse's **Manage OneLake security** command: create a role → choose Read or ReadWrite → select tables/folders → save → optionally add members and row/column filters.
+- Workspace **Admin**/**Member**/**Contributor** already have full read/write to all OneLake data — OneLake security roles don't restrict them. Roles matter for **Viewer**-role users or users with only item-level **Read** permission, who otherwise have no OneLake data access by default.
+- Every lakehouse ships with a built-in **`DefaultReader`** role granting all `ReadAll`-permission users access to all data. If you restrict a user to a custom, narrower role, you must also remove them from `DefaultReader` — otherwise they retain full read access through the default role anyway.
+- Only workspace **Admin** or **Member** can create/modify OneLake security roles.
 
 ### Access control layers (know which layer solves which problem)
 
@@ -66,15 +120,80 @@ A **workspace** is the unit of collaboration and access control in Fabric — it
 | **Object-level security (OLS)** | Whole tables/objects (deny access to a table entirely, hides it from schema browsing) | Hide a staging table from analysts |
 | **Folder/file-level security (OneLake data access roles)** | Specific folders/files in OneLake, enforced across every engine that reads OneLake | Restrict a `/raw/hr/` folder to the HR Spark job identity |
 
-- Workspace roles: **Admin** (full control incl. permissions) > **Member** (edit + manage some settings) > **Contributor** (edit content, no permission management) > **Viewer** (read-only).
-- RLS/OLS are configured on Warehouses/Lakehouses (SQL analytics endpoint) via T-SQL security policies (`CREATE SECURITY POLICY`) much like Azure SQL / Synapse RLS; CLS via `GRANT`/`DENY` on columns or views.
-- **OneLake security (data access roles)** is the newer, engine-agnostic layer: define roles scoped to OneLake folders that apply consistently whether the caller is Spark, SQL endpoint, Power BI, or an external app reading OneLake directly — closes the gap where SQL-level RLS didn't protect direct file access.
+### Row-level security (RLS) — T-SQL
 
-### Dynamic data masking
+RLS filters which rows a user sees, transparently, without changing application queries. It has two parts: a **filter predicate** (an inline table-valued function returning true/false per row) and a **security policy** (binds the predicate to a table).
 
-- Masks column values at query time for non-privileged users without altering stored data (e.g., show `XXX-XX-1234` for an SSN column).
-- Built-in mask functions: default, email, random (numeric), custom string (partial masking).
-- Privileged roles (e.g., table owner, `UNMASK` permission) see unmasked data; everyone else sees the masked pattern.
+```sql
+-- Create a schema for security objects
+CREATE SCHEMA [Sec];
+GO
+
+-- Define the filter predicate
+CREATE FUNCTION sec.tvf_SecurityPredicateBySalesPerson(@SalesPerson AS NVARCHAR(50))
+    RETURNS TABLE
+WITH SCHEMABINDING
+AS
+    RETURN SELECT 1 AS result
+           WHERE @SalesPerson = USER_NAME()
+              OR USER_NAME() = 'salesadmin@contoso.com';
+GO
+
+-- Apply the policy to the Sales table
+CREATE SECURITY POLICY sec.SalesPolicy
+ADD FILTER PREDICATE sec.tvf_SecurityPredicateBySalesPerson(SalesPerson) ON [dbo].[Sales]
+WITH (STATE = ON);
+GO
+```
+
+**Exam-relevant gotchas**: RLS predicates apply to *everyone*, including workspace Admins/Members/Contributors — if a predicate doesn't explicitly include an admin condition, admins get filtered too. RLS is also vulnerable to **side-channel attacks** (e.g. a crafted query that triggers a divide-by-zero only when a hidden value matches a guess) — combine RLS with CLS and dynamic data masking to reduce this risk, and restrict `ALTER ANY SECURITY POLICY` to trusted users.
+
+### Column-level security (CLS) — T-SQL
+
+CLS restricts specific columns; users without permission get an error selecting that column, but keep normal access to the rest of the table.
+
+```sql
+CREATE ROLE Doctor AUTHORIZATION dbo;
+CREATE ROLE Receptionist AUTHORIZATION dbo;
+GO
+
+GRANT SELECT ON dbo.Patients TO Doctor;
+GRANT SELECT ON dbo.Patients TO Receptionist;
+GO
+
+-- Deny SELECT on the sensitive column for roles that shouldn't see it
+DENY SELECT ON dbo.Patients (MedicalHistory) TO Receptionist;
+GO
+```
+
+**Direct Lake gotcha**: when Power BI queries a warehouse in Direct Lake mode and the table has CLS applied, queries **automatically fall back to DirectQuery** — security is still enforced, but at DirectQuery performance instead of the Direct Lake baseline.
+
+### Dynamic data masking — T-SQL
+
+Masks column values at query time for non-privileged users; the stored data is untouched, so DDM can be added to an existing warehouse without schema changes.
+
+| Masking type | What it shows | Function |
+|---|---|---|
+| **Default** | Type-based full replacement — numbers→0, strings→XXXX, dates→1900-01-01 | `default()` |
+| **Email** | First character + fixed `.com` suffix, e.g. `j*****@contoso.com` | `email()` |
+| **Custom text (partial)** | Configurable prefix/suffix characters exposed, custom padding between | `partial(prefix, padding, suffix)` |
+| **Random** | Random number in a specified range, for numeric/binary columns | `random(low, high)` |
+
+```sql
+ALTER TABLE Customers
+ALTER COLUMN Email ADD MASKED WITH (FUNCTION = 'email()');
+
+ALTER TABLE Customers
+ALTER COLUMN CreditCardNumber ADD MASKED WITH (FUNCTION = 'partial(0,"XXXX-XXXX-XXXX-",4)');
+
+-- Grant a specific non-admin user the ability to see unmasked data
+GRANT UNMASK ON dbo.Customers TO [user@contoso.com];
+
+-- Let an engineer manage masks without full admin rights
+GRANT ALTER ANY MASK TO [engineer@contoso.com];
+```
+
+Users with `CONTROL` permission (Admins, Members, Contributors) always see unmasked data by default. **Gotcha**: DDM doesn't prevent querying the column — it only obscures the displayed value — so a masked user can still infer real values through side-channel queries (e.g. forcing an error that only occurs for a specific hidden value). Treat masking as one layer, not the only control.
 
 ### Sensitivity labels
 
@@ -89,7 +208,20 @@ A **workspace** is the unit of collaboration and access control in Fabric — it
 
 ### Audit logs
 
-- Fabric activities (item creation/deletion, sharing, exports, access) flow into the **Microsoft Purview audit log** / unified Microsoft 365 audit log, queryable via the compliance portal or Graph API for security investigations and compliance reporting.
+- Fabric activities (item creation/deletion, sharing, exports, access) flow into the **Microsoft Purview audit log** / unified Microsoft 365 audit log, queryable via the compliance portal or Graph API for security investigations and compliance reporting. The Fabric admin portal also has a dedicated **Audit logs** section.
+
+### Securing a medallion lakehouse (applied example)
+
+*Source: [Organize a Fabric lakehouse using medallion architecture design](https://learn.microsoft.com/en-us/training/modules/describe-medallion-architecture/) — Secure and govern your medallion lakehouse.*
+
+A medallion architecture creates a natural access boundary: data engineers work in bronze/silver, analysts and business users consume gold. Two approaches enforce that boundary:
+
+| Approach | When to use |
+|---|---|
+| OneLake data access roles (single lakehouse, role scoped to gold tables) | Teams sharing a workspace who need different table access per layer |
+| Separate workspace per medallion layer | Strong isolation, compliance boundaries, or separate capacity required |
+
+Change management matters here too: Git integration versions pipeline/notebook/lakehouse definitions together so a bad transformation can be reverted; deployment pipelines then promote the whole medallion workspace through Dev → Test → Production in a controlled sequence.
 
 ## Orchestrate Processes
 
